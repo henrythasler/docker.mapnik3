@@ -1,4 +1,5 @@
 # Ubuntu 16.04
+# see https://github.com/phusion/baseimage-docker#using
 FROM phusion/baseimage:0.9.19
 
 MAINTAINER Henry Thasler <docker@thasler.org>
@@ -26,33 +27,19 @@ RUN apt-get install -y --no-install-recommends \
               zlib1g-dev \
               clang \
               make \
-              pkg-config
+              pkg-config \
+              apt-utils
               
 # download sources and prepare for build
+# see https://github.com/mapnik/mapnik/blob/master/INSTALL.md for build details
 RUN cd $BPATH \
-        && git clone --depth 10 --branch $MAPNIK_VERSION $MAPNIK_SOURCE \
+        && git clone --depth 1 --branch $MAPNIK_VERSION $MAPNIK_SOURCE \
         && cd $BPATH/mapnik \
         && git submodule update --init
         
-# prepare some more
-#RUN cd $BPATH/mapnik \
-#        && RUN /bin/bash -c "source $BPATH/mapnik/bootstrap.sh"
-#        && . bootstrap.sh
-         
-#RUN apt-get install libcairo2 libcairo2-dev python-cairo python-cairo-dev libcairomm-1.0-1v5 libcairomm-1.0-dev 
-#RUN apt-get install -y \
-#  build-essential libfreetype6 libfreetype6-dev \
-#  icu-devtools libicu-dev libharfbuzz-dev \
-#  libboost-dev libboost-filesystem-dev \
-#  libboost-regex-dev libboost-thread-dev \
-#  libboost-system-dev libboost-program-options-dev \
-  
-# optional dependencies  
-#RUN apt-get install -y \
-#  libpng-dev libjpeg-dev libtiff-dev libwebp-dev libproj-dev libgdal-dev  
-        
-#build+install mapnik, 
-#create a separate bash instance to persist exported variables 
+# build+install mapnik, create a separate bash instance to persist exported variables 
+# turn off cairo-support, since it won't compile due to some header issues
+# see https://github.com/mapnik/mapnik/wiki/MapnikRenderers for details about MapnikRenderers
 RUN /bin/bash -c 'cd $BPATH/mapnik \
         && source bootstrap.sh \
         && ./configure CUSTOM_CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" CAIRO=False \
@@ -63,5 +50,30 @@ RUN /bin/bash -c 'cd $BPATH/mapnik \
 RUN cd $BPATH \
         && rm -r mapnik
 
+        
+# install python bindings        
+# install setuptools
+RUN apt-get install -y --no-install-recommends \
+              wget \
+        && wget https://bootstrap.pypa.io/ez_setup.py -O - | python    
+        
+# get egg-file and install
+RUN cd $BPATH \
+        && wget https://pypi.python.org/packages/7b/96/12930cefa3048a79ea74c24fdf32def0820335da23a8c4d00ccc5d41e21b/mapnik-0.1-py2.7-linux-x86_64.egg#md5=6c376914c4e72d603a6510c5bd39ee2f  
+        && easy_install mapnik-0.1-py2.7-linux-x86_64.egg
+        
+# install some more dependencies
+#RUN apt-get install -y --no-install-recommends \
+#              wget \
+#              libboost-dev libboost-thread-dev libboost-system-dev libboost-python \
+#        && wget https://bootstrap.pypa.io/ez_setup.py -O - | python    
+
+# install python bindings
+#RUN cd $BPATH \
+#        && git clone https://github.com/mapnik/python-mapnik.git \
+#        && cd $BPATH/python-mapnik \
+#        && python setup.py install
+
+        
 # Clean up APT when done.
 #RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
